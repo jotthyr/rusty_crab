@@ -19,10 +19,12 @@ syst.set_clock_source( SystClkSource::Core );
 syst.set_reload( 2_100_000 );
 syst.enable_counter();
 
-// Set up GPIO pin B3 as push-pull output.
+// Set up GPIO pin PA5 as push-pull output.
 let p = stm32f303::Peripherals::take().unwrap();
 let gpioa = p.GPIOA;
+let gpioc = p.GPIOC;
 unsafe { gpioa.moder.write( |w| w.moder5().bits( 0b01 ) ); }
+unsafe { gpioc.moder.write( |w| w.moder13().bits( 0b00 ) ); }
 gpioa.otyper.write( |w| w.ot5().clear_bit() );
 
 // Restart the SysTick counter.
@@ -30,10 +32,10 @@ syst.clear_current();
 
 // Main loop.
 loop {
-// Toggle the LED every SysTick tick.
-while !syst.has_wrapped() {};
-gpioa.odr.write( |w| w.odr5().set_bit() );
-while !syst.has_wrapped() {};
-gpioa.odr.write( |w| w.odr5().clear_bit() );
+  if(gpioc.idr.read().idr13().bit_is_set() == true ) {
+    gpioa.odr.write( |w| w.odr5().set_bit() );
+  } else {
+    gpioa.odr.write( |w| w.odr5().clear_bit() );
+  }
 }
 }
