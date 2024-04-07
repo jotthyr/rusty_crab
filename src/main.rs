@@ -21,6 +21,9 @@ syst.enable_counter();
 
 // Set up GPIO pin PA5 as push-pull output.
 let p = stm32f303::Peripherals::take().unwrap();
+let rcc = p.RCC;
+rcc.ahbenr.write(|w| w.iopaen().set_bit());
+rcc.ahbenr.write(|w| w.iopcen().set_bit());
 let gpioa = p.GPIOA;
 let gpioc = p.GPIOC;
 unsafe { gpioa.moder.write( |w| w.moder5().bits( 0b01 ) ); }
