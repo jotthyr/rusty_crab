@@ -1,7 +1,7 @@
-
 [build]
 # Always compile for the instruction set of the STM32F3
-target = "thumbv7m-none-eabi"
+target = "thumbv7em-none-eabi"
 
+[target.thumbv7em-none-eabi]
 # use the Tlink.x scrip from the cortex-m-rt crate
 rustflags = [ "-C", "link-arg=-Tlink.x"]

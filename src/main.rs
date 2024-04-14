@@ -1,44 +1,49 @@
+//! STM32F303RE example using stm32-metapac
+
 #![no_std]
 #![no_main]
 
-// Halt when the program panics.
-extern crate panic_halt;
+use panic_halt as _;
 
-// Includes.
-use cortex_m::peripheral::syst::SystClkSource;
-use cortex_m_rt::entry;
-use stm32f3::stm32f303;
+use cortex_m_rt::{entry};
+use stm32_metapac as device;
+use device::{gpio::vals::Moder, flash::vals::Latency};
 
 #[entry]
 fn main() -> ! {
-// Set up SysTick peripheral.
-let cm_p = cortex_m::Peripherals::take().unwrap();
-let mut syst = cm_p.SYST;
-syst.set_clock_source( SystClkSource::Core );
-// ~1s period; STM32L0 boots to a ~2.1MHz internal oscillator.
-syst.set_reload( 2_100_000 );
-syst.enable_counter();
+    let rcc = device::RCC;
+    let flash = device::FLASH;
 
-// Set up GPIO pin PA5 as push-pull output.
-let p = stm32f303::Peripherals::take().unwrap();
-let rcc = p.RCC;
-rcc.ahbenr.write(|w| w.iopaen().set_bit());
-rcc.ahbenr.write(|w| w.iopcen().set_bit());
-let gpioa = p.GPIOA;
-let gpioc = p.GPIOC;
-unsafe { gpioa.moder.write( |w| w.moder5().bits( 0b01 ) ); }
-unsafe { gpioc.moder.write( |w| w.moder13().bits( 0b00 ) ); }
-gpioa.otyper.write( |w| w.ot5().clear_bit() );
+    // 48 MHz would be more fun.
+    flash.acr().modify(|v| {
+        v.set_latency(Latency::WS1);
+    });
+    while flash.acr().read().latency() != Latency::WS1 {
+        // spin - should only take a few cycles
+    }
 
-// Restart the SysTick counter.
-syst.clear_current();
+    // rcc.cr().modify(|v| {
+    //     v.set_hsidiv(Hsidiv::DIV1);
+    // });
 
-// Main loop.
-loop {
-  if(gpioc.idr.read().idr13().bit_is_set() == true ) {
-    gpioa.odr.write( |w| w.odr5().set_bit() );
-  } else {
-    gpioa.odr.write( |w| w.odr5().clear_bit() );
-  }
-}
+    rcc.ahbenr().modify(|v| {
+        v.set_gpioaen(true);
+    });
+    cortex_m::asm::dsb(); // likely not necessary
+
+    let gpioa = device::GPIOA;
+    gpioa.moder().modify(|v| {
+        v.set_moder(5, Moder::OUTPUT);
+    });
+
+    loop {
+        gpioa.bsrr().write(|w| {
+            w.set_bs(5, true);
+        });
+        cortex_m::asm::delay(12_000_000);
+        gpioa.bsrr().write(|w| {
+            w.set_br(5, true);
+        });
+        cortex_m::asm::delay(12_000_000);
+    }
 }
