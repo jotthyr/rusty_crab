@@ -1,49 +1,24 @@
-//! STM32F303RE example using stm32-metapac
-
 #![no_std]
 #![no_main]
 
+use cortex_m::asm;
+use cortex_m_rt::entry;
 use panic_halt as _;
-
-use cortex_m_rt::{entry};
-use stm32_metapac as device;
-use device::{gpio::vals::Moder, flash::vals::Latency};
+use stm32f3xx_hal::{self as hal, pac, prelude::*};
 
 #[entry]
 fn main() -> ! {
-    let rcc = device::RCC;
-    let flash = device::FLASH;
+      let dp = pac::Peripherals::take().unwrap();
 
-    // 48 MHz would be more fun.
-    flash.acr().modify(|v| {
-        v.set_latency(Latency::WS1);
-    });
-    while flash.acr().read().latency() != Latency::WS1 {
-        // spin - should only take a few cycles
-    }
+      let mut rcc = dp.RCC.constrain();
+      let mut gpioa = dp.GPIOA.split(&mut rcc.ahb);
 
-    // rcc.cr().modify(|v| {
-    //     v.set_hsidiv(Hsidiv::DIV1);
-    // });
+      let mut led = gpioa
+            .pa5
+            .into_push_pull_output(&mut gpioa.moder, &mut gpioa.otyper);
 
-    rcc.ahbenr().modify(|v| {
-        v.set_gpioaen(true);
-    });
-    cortex_m::asm::dsb(); // likely not necessary
-
-    let gpioa = device::GPIOA;
-    gpioa.moder().modify(|v| {
-        v.set_moder(5, Moder::OUTPUT);
-    });
-
-    loop {
-        gpioa.bsrr().write(|w| {
-            w.set_bs(5, true);
-        });
-        cortex_m::asm::delay(12_000_000);
-        gpioa.bsrr().write(|w| {
-            w.set_br(5, true);
-        });
-        cortex_m::asm::delay(12_000_000);
-    }
+      loop {
+            led.toggle().unwrap();
+            asm::delay(8_000_000);
+      }
 }
