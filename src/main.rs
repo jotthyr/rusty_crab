@@ -44,9 +44,11 @@ async fn main(spawner: Spawner) {
     let p = embassy_stm32::init(Default::default());
 
     let ch1 = PwmPin::new_ch1(p.PC0, OutputType::PushPull);
-    let mut pwm = SimplePwm::new(p.TIM1, Some(ch1), None, None, None, hz(50), Default::default());
+    let ch2 = PwmPin::new_ch2(p.PC1, OutputType::PushPull);
+    let mut pwm = SimplePwm::new(p.TIM1, Some(ch1), Some(ch2), None, None, hz(50), Default::default());
     let max = pwm.get_max_duty();
     pwm.enable(Channel::Ch1);
+    pwm.enable(Channel::Ch2);
 
     // Spawned tasks run in the background, concurrently.
     spawner.spawn(blink(p.PA5.degrade())).unwrap();
@@ -60,6 +62,7 @@ async fn main(spawner: Spawner) {
     const SPEED_OF_SOUND: f64 = 0.0343;
 
     pwm.set_duty(Channel::Ch1, max / 40);
+    pwm.set_duty(Channel::Ch2, max / 40);
 
     fn calculate_speed(duration: Duration) -> Unit {
         // cannot calculate distance if no object is
@@ -108,7 +111,6 @@ async fn main(spawner: Spawner) {
 
     loop {
 
-        info!("{}",pwm.get_max_duty());
         // Asynchronously wait for GPIO events, allowing other tasks
         // to run, or the core to sleep.
         trigger.set_low();
@@ -117,21 +119,49 @@ async fn main(spawner: Spawner) {
         Timer::after(Duration::from_micros(10)).await;
         trigger.set_low();
 
-        info!("debug 1");
-
         echo.wait_for_high().await;
         let instant = Instant::now();
         echo.wait_for_low().await;
 
-        info!("debug 2");
-
         let duration = Instant::checked_duration_since(&Instant::now(), instant).unwrap();
 
         Timer::after_millis(100).await;
-        pwm.set_duty(Channel::Ch1, calculate_speed(duration).centimeters as u16 * 100);
 
-        info!("debug {}", calculate_speed(duration).centimeters);
-        info!("debug {}", duration);
+        // pwm.set_duty(Channel::Ch1, calculate_speed(duration).centimeters as u16 * 100);
+        // pwm.set_duty(Channel::Ch2, calculate_speed(duration).centimeters as u16 * 100);
+        if (calculate_speed(duration).centimeters < 20.0 ) {
+            pwm.set_duty(Channel::Ch1, max / 40);
+            pwm.set_duty(Channel::Ch2, max / 40);
+            Timer::after_millis(200).await;
+            pwm.set_duty(Channel::Ch1, max / 30);
+            pwm.set_duty(Channel::Ch2, max / 30);
+            Timer::after_millis(200).await;
+            pwm.set_duty(Channel::Ch1, max / 25);
+            pwm.set_duty(Channel::Ch2, max / 25);
+            Timer::after_millis(200).await;
+            pwm.set_duty(Channel::Ch1, max / 20);
+            pwm.set_duty(Channel::Ch2, max / 20);
+            Timer::after_millis(200).await;
+            pwm.set_duty(Channel::Ch1, max / 10);
+            pwm.set_duty(Channel::Ch2, max / 10);
+        }
+
+        if (calculate_speed(duration).centimeters > 20.0 ) {
+            pwm.set_duty(Channel::Ch1, max / 40);
+            pwm.set_duty(Channel::Ch2, max / 10);
+            Timer::after_millis(200).await;
+            pwm.set_duty(Channel::Ch1, max / 30);
+            pwm.set_duty(Channel::Ch2, max / 20);
+            Timer::after_millis(200).await;
+            pwm.set_duty(Channel::Ch1, max / 25);
+            pwm.set_duty(Channel::Ch2, max / 25);
+            Timer::after_millis(200).await;
+            pwm.set_duty(Channel::Ch1, max / 20);
+            pwm.set_duty(Channel::Ch2, max / 30);
+            Timer::after_millis(200).await;
+            pwm.set_duty(Channel::Ch1, max / 10);
+            pwm.set_duty(Channel::Ch2, max / 40);
+        }
 
     }
 }
